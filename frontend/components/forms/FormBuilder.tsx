@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -52,6 +52,42 @@ export default function FormBuilder({ onSubmit, loading, defaultValues }: {
 }) {
   const [step, setStep] = useState<'type' | 'design' | 'ai-config'>('type');
   const [generatingAI, setGeneratingAI] = useState(false);
+
+  // Logo upload state
+  const [logoPreview, setLogoPreview] = useState<string>(
+    parseJson<{ logo_url?: string }>(defaultValues?.branding, {}).logo_url || ''
+  );
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoError('');
+    const reader = new FileReader();
+    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    setLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('logo', file);
+      const res = await api.post('/upload/logo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      updateBranding('logo_url', res.data.url);
+    } catch {
+      setLogoError('Upload failed. Please try again.');
+      setLogoPreview(formData.branding.logo_url || '');
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  }
+
+  function removeLogo() {
+    setLogoPreview('');
+    updateBranding('logo_url', '');
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  }
 
   const [formData, setFormData] = useState<FormData>({
     name: defaultValues?.name || 'Contact Us',
@@ -287,8 +323,30 @@ export default function FormBuilder({ onSubmit, loading, defaultValues }: {
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Logo URL</label>
-            <input value={formData.branding.logo_url} onChange={e => updateBranding('logo_url', e.target.value)} placeholder="https://..." className={inputCls} />
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Form Logo</label>
+            <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {logoPreview
+                  ? <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-0.5" />
+                  : <span className="text-lg text-slate-300">🏢</span>}
+              </div>
+              <div className="flex gap-2 flex-1">
+                <button type="button" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}
+                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition disabled:opacity-60 flex items-center gap-1.5">
+                  {logoUploading
+                    ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Uploading...</>
+                    : <>↑ Upload</>}
+                </button>
+                {logoPreview && (
+                  <button type="button" onClick={removeLogo}
+                    className="px-3 py-2 text-red-500 text-xs font-medium rounded-lg border border-slate-200 hover:bg-red-50 transition">
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+            {logoError && <p className="mt-1 text-xs text-red-500">{logoError}</p>}
           </div>
           <div className="col-span-2 md:col-span-3">
             <label className="text-sm font-medium text-slate-700 mb-1.5 block">Form Description</label>

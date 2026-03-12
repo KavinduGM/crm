@@ -95,10 +95,23 @@ async function processLead(lead, meta) {
   }
 
   // ═══════════════════════════════════════════
-  // LAYER 3 — AI LEAD ANALYZER
+  // LAYER 3 — AI LEAD ANALYZER + SPAM CLASSIFIER
   // ═══════════════════════════════════════════
   const { analysis: aiAnalysis } = await analyzeWithAI(lead, businessContext);
-  pipelineLog.push({ layer: 3, name: 'AIAnalyzer', result: 'ANALYZED', intent: aiAnalysis.intent, urgency: aiAnalysis.urgency });
+  pipelineLog.push({ layer: 3, name: 'AIAnalyzer', result: 'ANALYZED', intent: aiAnalysis.intent, urgency: aiAnalysis.urgency, is_spam: aiAnalysis.is_spam });
+
+  // ── AI Spam verdict (catches subtle spam that rules miss) ──
+  if (aiAnalysis.is_spam === true) {
+    const aiSpamReasons = [...(spamResult.reasons || []), `ai_spam: ${aiAnalysis.spam_reason || 'flagged by AI'}`];
+    const aiSpamScore = Math.max(spamResult.score, 75);
+    const spamId = await storeSpamLead(lead, {
+      businessId, formId, sourceUrl, ipAddress,
+      spamScore: aiSpamScore,
+      spamReasons: aiSpamReasons,
+    });
+    await autoDeleteOldestSpam(businessId);
+    return { status: 'spam', spamLeadId: spamId, score: aiSpamScore, reasons: aiSpamReasons, detectedBy: 'ai' };
+  }
 
   // ═══════════════════════════════════════════
   // LEAD SCORING ENGINE

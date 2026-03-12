@@ -1,43 +1,59 @@
 /**
- * LAYER 3 — AI Lead Analyzer
- * Only called for leads that passed Layers 1 & 2.
+ * LAYER 3 — AI Lead Analyzer + Spam Classifier
+ *
+ * Single GPT call that does two jobs:
+ *   1. Spam / junk detection (service promos, scam, mass outreach, hotmail blasts)
+ *   2. Lead quality analysis for legitimate inquiries
+ *
  * Uses GPT-4o-mini for cost efficiency.
- * Returns structured AI analysis.
  */
 const openai = require('../../config/openai');
 
 /**
- * @param {Object} lead - { name, email, phone, message, answers, location?, service? }
+ * @param {Object} lead - { name, email, phone, message, answers }
  * @param {Object} businessContext - { company_name, industry, services }
- * @returns {Object} analysis - structured lead analysis
+ * @returns {{ success: boolean, analysis: Object }}
  */
 async function analyzeWithAI(lead, businessContext = {}) {
   const messageText = buildMessageText(lead);
+  const emailDomain = (lead.email || '').split('@')[1] || '';
 
-  const prompt = `You are an expert CRM lead analyst. Analyze this incoming lead for a ${businessContext.industry || 'business'} company named "${businessContext.company_name || 'the business'}".
+  const prompt = `You are an expert CRM analyst. You have TWO jobs for this submission:
 
-Business services offered: ${businessContext.services || 'General services'}
+JOB 1 — SPAM DETECTION
+Decide if this submission is spam, junk, or unsolicited promotional outreach. Mark is_spam = true if ANY of these apply:
+- Promoting a service, software, agency, or product the business didn't ask for
+- SEO services, backlinks, link building, digital marketing offers
+- Mass outreach / cold email templates ("I came across your website...")
+- Scam, phishing, fake prize, financial schemes, crypto, gambling
+- Gibberish, test submissions, or clearly fake contact details
+- The message is NOT a genuine customer inquiry about the business's own services
 
-Lead Information:
+JOB 2 — LEAD ANALYSIS (only matters if is_spam = false)
+Analyse the lead quality for a ${businessContext.industry || 'business'} company named "${businessContext.company_name || 'the business'}" offering: ${businessContext.services || 'general services'}.
+
+Submission details:
 - Name: ${lead.name || 'Unknown'}
-- Email: ${lead.email || 'Not provided'}
+- Email: ${lead.email || 'Not provided'} (domain: ${emailDomain})
 - Phone: ${lead.phone || 'Not provided'}
-- Message/Inquiry: ${messageText}
+- Message: ${messageText}
 ${lead.location ? `- Location: ${lead.location}` : ''}
 ${lead.service ? `- Service requested: ${lead.service}` : ''}
 
-Analyze this lead and return ONLY a valid JSON object with this exact structure:
+Return ONLY a valid JSON object with this exact structure:
 {
+  "is_spam": <true | false>,
+  "spam_reason": "<one-line reason if is_spam is true, else null>",
   "intent": "Service Request" | "Information Request" | "Quote Request" | "Emergency" | "General Inquiry",
-  "service_requested": "specific service name or null",
+  "service_requested": "<specific service or null>",
   "urgency": "Immediate" | "Within 24 hours" | "Within a week" | "Within a month" | "Planning stage" | "Unknown",
-  "budget_signal": "specific budget range or null",
-  "location": "detected location or null",
+  "budget_signal": "<budget range or null>",
+  "location": "<detected location or null>",
   "project_size": "Small" | "Medium" | "Large" | "Enterprise" | "Unknown",
-  "summary": "2-3 sentence professional summary of the inquiry",
+  "summary": "<2-3 sentence professional summary>",
   "service_relevance": "High" | "Medium" | "Low",
   "conversion_probability": <number 0-100>,
-  "estimated_value": "estimated project value range or null",
+  "estimated_value": "<project value range or null>",
   "key_signals": ["array", "of", "notable", "signals"]
 }`;
 
@@ -46,8 +62,8 @@ Analyze this lead and return ONLY a valid JSON object with this exact structure:
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 500,
+      temperature: 0.2,
+      max_tokens: 600,
     });
 
     const raw = completion.choices[0].message.content;
@@ -55,10 +71,11 @@ Analyze this lead and return ONLY a valid JSON object with this exact structure:
     return { success: true, analysis };
   } catch (error) {
     console.error('AI Analyzer error:', error.message);
-    // Return a fallback analysis so pipeline continues
     return {
       success: false,
       analysis: {
+        is_spam: false,
+        spam_reason: null,
         intent: 'General Inquiry',
         service_requested: lead.service || null,
         urgency: 'Unknown',
