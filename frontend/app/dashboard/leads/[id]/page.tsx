@@ -111,11 +111,27 @@ export default function LeadDetailPage() {
   if (loading) return <div className="p-8"><div className="h-8 bg-slate-200 rounded animate-pulse w-48" /></div>;
   if (!lead) return <div className="p-8 text-slate-500">Lead not found.</div>;
 
-  // Parse ai_analysis if it's a string
+  // Safely parse JSON columns returned as strings from MySQL
+  function parseJson<T>(val: unknown, fallback: T): T {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'object') return val as T;
+    if (typeof val === 'string') {
+      try { return JSON.parse(val) as T; } catch { return fallback; }
+    }
+    return fallback;
+  }
+
+  const answers = parseJson<Array<{ question: string; answer: string }>>(lead.answers, []);
+
+  // Parse ai_analysis safely
   let ai: AiAnalysis | null = null;
   if (lead.ai_analysis) {
-    ai = typeof lead.ai_analysis === 'string' ? JSON.parse(lead.ai_analysis) : lead.ai_analysis;
+    ai = parseJson<AiAnalysis | null>(lead.ai_analysis, null);
   }
+
+  // AI returns conversion_probability as 0-100 integer
+  const convProb = ai?.conversion_probability ?? null;
+  const convProbPct = convProb !== null ? Math.min(Math.round(convProb), 100) : null;
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -213,7 +229,7 @@ export default function LeadDetailPage() {
 
           {/* Probability + Value */}
           <div className="grid grid-cols-2 gap-3 mb-4">
-            {ai.conversion_probability !== undefined && (
+            {convProbPct !== null && (
               <div className="border border-slate-100 rounded-xl p-3">
                 <p className="text-xs text-slate-500 mb-2">Conversion Probability</p>
                 <div className="flex items-center gap-2">
@@ -221,12 +237,12 @@ export default function LeadDetailPage() {
                     <div
                       className="h-1.5 rounded-full"
                       style={{
-                        width: `${Math.round(ai.conversion_probability * 100)}%`,
-                        backgroundColor: ai.conversion_probability >= 0.7 ? '#22c55e' : ai.conversion_probability >= 0.4 ? '#f59e0b' : '#94a3b8'
+                        width: `${convProbPct}%`,
+                        backgroundColor: convProbPct >= 70 ? '#22c55e' : convProbPct >= 40 ? '#f59e0b' : '#94a3b8'
                       }}
                     />
                   </div>
-                  <span className="text-sm font-bold text-slate-700">{Math.round(ai.conversion_probability * 100)}%</span>
+                  <span className="text-sm font-bold text-slate-700">{convProbPct}%</span>
                 </div>
               </div>
             )}
@@ -288,11 +304,11 @@ export default function LeadDetailPage() {
       </div>
 
       {/* Answers */}
-      {lead.answers && lead.answers.length > 0 && (
+      {answers.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-5">
           <h2 className="font-semibold text-slate-900 mb-4">Form Responses</h2>
           <div className="space-y-4">
-            {lead.answers.map((a, i) => (
+            {answers.map((a, i) => (
               <div key={i} className="p-4 bg-slate-50 rounded-xl">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{a.question}</p>
                 <p className="text-slate-900 text-sm">{a.answer || '—'}</p>
