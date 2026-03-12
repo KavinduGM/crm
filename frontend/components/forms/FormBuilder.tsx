@@ -35,6 +35,16 @@ interface FormData {
 
 const inputCls = 'w-full px-3 py-2.5 rounded-lg border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition';
 
+// MySQL returns JSON columns as raw strings — parse safely
+function parseJson<T>(val: unknown, fallback: T): T {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'object') return val as T;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val) as T; } catch { return fallback; }
+  }
+  return fallback;
+}
+
 export default function FormBuilder({ onSubmit, loading, defaultValues }: {
   onSubmit: (data: FormData) => Promise<void>;
   loading: boolean;
@@ -46,10 +56,10 @@ export default function FormBuilder({ onSubmit, loading, defaultValues }: {
   const [formData, setFormData] = useState<FormData>({
     name: defaultValues?.name || 'Contact Us',
     form_type: defaultValues?.form_type || 'standard',
-    fields: defaultValues?.fields || JSON.parse(JSON.stringify(DEFAULT_FIELDS)),
-    branding: defaultValues?.branding || { primary_color: '#6366f1', font: 'Inter', description: "Fill out the form below and we'll get back to you shortly.", logo_url: '' },
-    contact_info: defaultValues?.contact_info || { email: '', messaging_apps: {}, social_links: {} },
-    ai_config: defaultValues?.ai_config || { industry: '', category: '', services: '', goal: '', target_customer: '', generated_questions: [] },
+    fields: parseJson(defaultValues?.fields, JSON.parse(JSON.stringify(DEFAULT_FIELDS))),
+    branding: parseJson(defaultValues?.branding, { primary_color: '#6366f1', font: 'Inter', description: "Fill out the form below and we'll get back to you shortly.", logo_url: '' }),
+    contact_info: parseJson(defaultValues?.contact_info, { email: '', messaging_apps: {}, social_links: {} }),
+    ai_config: parseJson(defaultValues?.ai_config, { industry: '', category: '', services: '', goal: '', target_customer: '', generated_questions: [] }),
     thank_you_message: defaultValues?.thank_you_message || 'Thank you for contacting us. Our team will get back to you shortly.',
   });
 
