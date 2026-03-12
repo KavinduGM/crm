@@ -1,11 +1,11 @@
 /**
- * LAYER 3 — AI Lead Analyzer + Spam Classifier
+ * AI Lead Classifier + Analyzer
  *
- * Single GPT call that does two jobs:
- *   1. Spam / junk detection (service promos, scam, mass outreach, hotmail blasts)
- *   2. Lead quality analysis for legitimate inquiries
+ * Single GPT-4o-mini call that does EVERYTHING:
+ *   1. Classifies the submission: spam | sales_pitch | qualified
+ *   2. If qualified: scores it (0–100) and produces full analysis
  *
- * Uses GPT-4o-mini for cost efficiency.
+ * No rule-based pre-filtering. GPT reads the raw submission and decides.
  */
 const openai = require('../../config/openai');
 
@@ -18,32 +18,53 @@ async function analyzeWithAI(lead, businessContext = {}) {
   const messageText = buildMessageText(lead);
   const emailDomain = (lead.email || '').split('@')[1] || '';
 
-  const prompt = `You are an expert CRM analyst. You have TWO jobs for this submission:
+  const prompt = `You are an expert CRM lead analyst for a ${businessContext.industry || 'business'} company called "${businessContext.company_name || 'the business'}" that provides: ${businessContext.services || 'various services'}.
 
-JOB 1 — SPAM DETECTION
-Decide if this submission is spam, junk, or unsolicited promotional outreach. Mark is_spam = true if ANY of these apply:
-- Promoting a service, software, agency, or product the business didn't ask for
-- SEO services, backlinks, link building, digital marketing offers
-- Mass outreach / cold email templates ("I came across your website...")
-- Scam, phishing, fake prize, financial schemes, crypto, gambling
-- Gibberish, test submissions, or clearly fake contact details
-- The message is NOT a genuine customer inquiry about the business's own services
+A form submission just came in. Your job:
 
-JOB 2 — LEAD ANALYSIS (only matters if is_spam = false)
-Analyse the lead quality for a ${businessContext.industry || 'business'} company named "${businessContext.company_name || 'the business'}" offering: ${businessContext.services || 'general services'}.
+━━━ STEP 1: CLASSIFY ━━━
+Choose exactly one:
 
-Submission details:
-- Name: ${lead.name || 'Unknown'}
-- Email: ${lead.email || 'Not provided'} (domain: ${emailDomain})
-- Phone: ${lead.phone || 'Not provided'}
-- Message: ${messageText}
-${lead.location ? `- Location: ${lead.location}` : ''}
-${lead.service ? `- Service requested: ${lead.service}` : ''}
+"spam" — Mark as spam if ANY of these apply:
+  • Message contains URLs / links promoting other websites or businesses
+  • Submission is clearly fake (e.g. "rahulkumar576576", gibberish names with numbers)
+  • Message is advertising, promoting, or selling something (products, blogs, websites)
+  • Crypto, gambling, adult content, pharmacy, lottery, prize scam
+  • No genuine service request — just self-promotion or junk
 
-Return ONLY a valid JSON object with this exact structure:
+"sales_pitch" — Mark as sales_pitch if:
+  • Person is pitching THEIR OWN services to this business (B2B cold outreach)
+  • Agency/freelancer offering SEO, marketing, web dev, design services
+  • "I can help your business grow", "we offer...", "our team specialises in..."
+  • Classic cold email openers: "I came across your website...", "I wanted to reach out..."
+
+"qualified" — Mark as qualified if:
+  • Genuine customer who wants THIS business's services
+  • Real person asking about pricing, availability, bookings, or help
+  • Even a simple "I need help with X" from a real person is qualified
+  • When in doubt and the message seems genuine, use qualified
+
+━━━ STEP 2: SCORE (only for qualified leads) ━━━
+Score 0–100 based on:
+  • How specific and clear the request is
+  • Urgency signals (emergency, ASAP, today, etc.)
+  • Budget mentioned
+  • Location provided
+  • Message quality and length
+  • How relevant it is to the business's services
+
+━━━ SUBMISSION ━━━
+Name: ${lead.name || 'Unknown'}
+Email: ${lead.email || 'Not provided'} (domain: ${emailDomain})
+Phone: ${lead.phone || 'Not provided'}
+Message: ${messageText || '(empty)'}
+
+━━━ RETURN JSON ONLY ━━━
 {
-  "is_spam": <true | false>,
-  "spam_reason": "<one-line reason if is_spam is true, else null>",
+  "classification": "spam" | "sales_pitch" | "qualified",
+  "classification_reason": "<one sentence why>",
+  "lead_score": <0-100 integer>,
+  "priority": "high" | "medium" | "low",
   "intent": "Service Request" | "Information Request" | "Quote Request" | "Emergency" | "General Inquiry",
   "service_requested": "<specific service or null>",
   "urgency": "Immediate" | "Within 24 hours" | "Within a week" | "Within a month" | "Planning stage" | "Unknown",
@@ -51,10 +72,9 @@ Return ONLY a valid JSON object with this exact structure:
   "location": "<detected location or null>",
   "project_size": "Small" | "Medium" | "Large" | "Enterprise" | "Unknown",
   "summary": "<2-3 sentence professional summary>",
-  "service_relevance": "High" | "Medium" | "Low",
-  "conversion_probability": <number 0-100>,
-  "estimated_value": "<project value range or null>",
-  "key_signals": ["array", "of", "notable", "signals"]
+  "conversion_probability": <0-100 integer>,
+  "estimated_value": "<value range or null>",
+  "key_signals": ["array", "of", "key", "signals"]
 }`;
 
   try {
@@ -62,31 +82,41 @@ Return ONLY a valid JSON object with this exact structure:
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      temperature: 0.2,
+      temperature: 0.1, // Low temperature = more consistent classification
       max_tokens: 600,
     });
 
     const raw = completion.choices[0].message.content;
     const analysis = JSON.parse(raw);
+
+    // Normalise fields so downstream code never crashes
+    analysis.classification = analysis.classification || 'qualified';
+    analysis.lead_score = Number(analysis.lead_score) || 0;
+    analysis.priority = analysis.priority || 'low';
+    analysis.key_signals = Array.isArray(analysis.key_signals) ? analysis.key_signals : [];
+    analysis.conversion_probability = Number(analysis.conversion_probability) || 0;
+
     return { success: true, analysis };
   } catch (error) {
     console.error('AI Analyzer error:', error.message);
+    // Fallback: treat as qualified so no lead is silently lost
     return {
       success: false,
       analysis: {
-        is_spam: false,
-        spam_reason: null,
+        classification: 'qualified',
+        classification_reason: 'AI unavailable — manual review recommended',
+        lead_score: 30,
+        priority: 'low',
         intent: 'General Inquiry',
-        service_requested: lead.service || null,
+        service_requested: null,
         urgency: 'Unknown',
         budget_signal: null,
-        location: lead.location || null,
+        location: null,
         project_size: 'Unknown',
-        summary: 'AI analysis unavailable. Manual review recommended.',
-        service_relevance: 'Medium',
-        conversion_probability: 40,
+        summary: 'AI analysis unavailable. Please review this lead manually.',
+        conversion_probability: 30,
         estimated_value: null,
-        key_signals: [],
+        key_signals: ['ai_unavailable'],
       },
     };
   }
