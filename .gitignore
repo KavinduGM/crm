@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment files — NEVER commit real secrets
+.env
+.env.local
+.env.production
+.env.development
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Uploaded files (user-generated content)
+backend/public/uploads/logos/*
+!backend/public/uploads/logos/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(mysql --version)",
+      "Bash(npm init -y)",
+      "Bash(npm install express mysql2 bcryptjs jsonwebtoken cors dotenv helmet express-rate-limit uuid multer openai)",
+      "Bash(npm install nodemon --save-dev)",
+      "Bash(npx create-next-app@latest frontend --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --no-turbopack)",
+      "Bash(npx create-next-app@latest frontend --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --no-turbopack --use-npm)",
+      "Bash(npm install axios react-hook-form @hookform/resolvers zod react-hot-toast lucide-react @radix-ui/react-dialog @radix-ui/react-select @radix-ui/react-tabs @radix-ui/react-dropdown-menu @radix-ui/react-tooltip clsx tailwind-merge)",
+      "Bash(npm run build)",
+      "Bash(chmod +x /Users/kavindugamlath/Desktop/CRM/start.sh)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(lsof -i :5000)",
+      "Bash(lsof -i :3000)",
+      "Bash(git init)",
+      "Bash(git remote add origin https://github.com/ranga2021/CRM.git)",
+      "Bash(git add .)"
+    ]
+  }
+}
