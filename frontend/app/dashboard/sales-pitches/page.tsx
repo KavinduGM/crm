@@ -15,6 +15,38 @@ interface Lead {
   pipeline_log: Array<{ layer: number; name: string; reasons?: string[] }>;
 }
 
+function IconMegaphone({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+    </svg>
+  );
+}
+function IconTrash({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  );
+}
+function IconX({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+function IconInbox({ className = 'w-12 h-12' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+    </svg>
+  );
+}
+
 export default function SalesPitchesPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +59,6 @@ export default function SalesPitchesPage() {
   async function fetchPitches() {
     setLoading(true);
     try {
-      // Leads with status=sales_pitch
       const res = await api.get(`/leads?status=sales_pitch&page=${page}&limit=20`);
       setLeads(res.data.data);
       setTotal(res.data.pagination.total);
@@ -47,15 +78,18 @@ export default function SalesPitchesPage() {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">📢 Sales Pitches Inbox</h1>
-        <p className="text-slate-500 mt-1">{total} outbound sales &amp; marketing messages captured by Layer 2 Intent Filter</p>
+        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <IconMegaphone className="w-6 h-6 text-orange-500" /> Sales Pitches Inbox
+        </h1>
+        <p className="text-slate-500 mt-1">{total} outbound sales &amp; marketing messages captured by the AI pipeline</p>
       </div>
 
       <div className="flex gap-6">
         <div className="flex-1 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="bg-orange-50 px-6 py-3 border-b border-orange-100">
+          <div className="bg-orange-50 px-6 py-3 border-b border-orange-100 flex items-center gap-2">
+            <IconMegaphone className="w-4 h-4 text-orange-600 flex-shrink-0" />
             <p className="text-sm text-orange-700 font-medium">
-              📢 These are outbound sales/marketing emails, NOT real leads. They are kept here for review.
+              These are outbound sales/marketing emails, NOT real leads. They are kept here for review.
             </p>
           </div>
 
@@ -65,7 +99,9 @@ export default function SalesPitchesPage() {
             </div>
           ) : leads.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
-              <p className="text-5xl mb-3">📭</p>
+              <div className="flex justify-center mb-3 text-slate-300">
+                <IconInbox />
+              </div>
               <p>No sales pitches detected yet.</p>
             </div>
           ) : (
@@ -74,8 +110,8 @@ export default function SalesPitchesPage() {
                 <div key={lead.id}
                   onClick={() => setSelected(lead)}
                   className={`flex items-center gap-4 px-6 py-4 cursor-pointer transition ${selected?.id === lead.id ? 'bg-orange-50' : 'hover:bg-slate-50'}`}>
-                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold flex-shrink-0">
-                    📢
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 flex-shrink-0">
+                    <IconMegaphone className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-slate-900 text-sm truncate">{lead.name || 'Unknown'}</p>
@@ -93,16 +129,17 @@ export default function SalesPitchesPage() {
           <div className="w-80 flex-shrink-0 bg-white rounded-2xl border border-slate-100 shadow-sm p-6 h-fit sticky top-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-900">Detail</h3>
-              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition">
+                <IconX className="w-4 h-4" />
+              </button>
             </div>
 
             <div className="space-y-3 text-sm mb-5">
-              <div><p className="text-slate-500 text-xs">Name</p><p className="font-medium">{selected.name || '—'}</p></div>
+              <div><p className="text-slate-500 text-xs">Name</p><p className="font-medium">{selected.name || '-'}</p></div>
               <div><p className="text-slate-500 text-xs">Email</p><p className="font-medium break-all">{selected.email}</p></div>
               <div><p className="text-slate-500 text-xs">Business</p><p className="font-medium">{selected.business_name}</p></div>
               <div><p className="text-slate-500 text-xs">Received</p><p className="font-medium">{formatDate(selected.submission_time)}</p></div>
 
-              {/* Detection signals */}
               {selected.pipeline_log && (
                 <div>
                   <p className="text-slate-500 text-xs mb-2">Detection Signals</p>
@@ -130,8 +167,8 @@ export default function SalesPitchesPage() {
             </div>
 
             <button onClick={() => deleteLead(selected.id)}
-              className="w-full py-2.5 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50 transition">
-              🗑 Delete
+              className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50 transition">
+              <IconTrash className="w-4 h-4" /> Delete
             </button>
           </div>
         )}
