@@ -63,6 +63,7 @@ app.use('/api/upload', require('./routes/upload.routes'));
 app.use('/api/captcha', require('./routes/captcha.routes'));
 app.use('/api/spam', require('./routes/spam.routes'));
 app.use('/api/analytics', require('./routes/analytics.routes'));
+app.use('/api/admin/settings', require('./routes/settings.routes'));
 
 // Unified lead submission endpoint (Phase 2)
 const { submitLead } = require('./controllers/leads_v2.controller');

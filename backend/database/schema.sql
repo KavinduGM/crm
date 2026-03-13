@@ -120,3 +120,18 @@ CREATE TABLE IF NOT EXISTS ai_sessions (
   INDEX idx_session_token (session_token),
   INDEX idx_form_id (form_id)
 );
+
+-- =============================================
+-- SYSTEM SETTINGS TABLE
+-- Stores dynamic config like API keys
+-- =============================================
+CREATE TABLE IF NOT EXISTS system_settings (
+  id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  setting_key VARCHAR(100) UNIQUE NOT NULL,
+  setting_value TEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Default Claude API key placeholder (overridden by .env or admin UI)
+INSERT IGNORE INTO system_settings (setting_key, setting_value)
+VALUES ('claude_api_key', NULL);

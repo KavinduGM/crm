@@ -1,13 +1,9 @@
 /**
- * Lead Processing Pipeline
+ * Lead Processing Pipeline (Claude AI)
  *
- * Simplified AI-first architecture:
- *
- *   1. Honeypot check   — free, instant. Bots fill hidden fields → instant reject
- *   2. Single AI call   — GPT classifies + scores + analyses in one shot
- *   3. Route result     — spam_leads | leads(sales_pitch) | leads(qualified)
- *
- * Rule-based layers removed. AI reads everything and decides.
+ *   1. Honeypot check  — free, instant. Bots fill hidden fields → instant reject
+ *   2. Claude AI call  — classifies (spam / sales_pitch / qualified) + scores
+ *   3. Route result    — spam_leads | leads(sales_pitch) | leads(qualified)
  */
 const { pool } = require('../../config/db');
 const { analyzeWithAI } = require('./aiAnalyzer');
@@ -61,30 +57,30 @@ async function processLead(lead, meta) {
   } catch { /* non-fatal */ }
 
   // ═══════════════════════════════════════════
-  // LAYER 2 — AI: classify + score + analyse
+  // LAYER 2 — Claude AI: classify + score
   // ═══════════════════════════════════════════
   const { analysis } = await analyzeWithAI(lead, businessContext);
-  const { classification } = analysis;
+  const { is_spam, lead_score, reason, priority, lead_score_numeric } = analysis;
 
   // ── Spam ────────────────────────────────────
-  if (classification === 'spam') {
+  if (is_spam) {
     const spamId = await storeSpamLead(lead, {
       businessId, formId, sourceUrl, ipAddress,
-      spamScore: Math.max(analysis.lead_score || 0, 75),
-      spamReasons: [`ai: ${analysis.classification_reason || 'flagged by AI'}`],
+      spamScore: 90,
+      spamReasons: [`ai: ${reason || 'flagged by AI'}`],
     });
     await autoDeleteOldestSpam(businessId);
     return {
       status: 'spam',
       spamLeadId: spamId,
-      score: Math.max(analysis.lead_score || 0, 75),
-      reasons: [analysis.classification_reason],
-      detectedBy: 'ai',
+      score: 90,
+      reasons: [reason],
+      detectedBy: 'claude_ai',
     };
   }
 
-  // ── Sales pitch ─────────────────────────────
-  if (classification === 'sales_pitch') {
+  // ── Sales pitch (lead_score === 'none') ─────
+  if (lead_score === 'none') {
     const leadId = await storeLead(lead, {
       businessId, formId, sourceUrl, ipAddress,
       status: 'sales_pitch',
@@ -92,23 +88,23 @@ async function processLead(lead, meta) {
       leadScore: 0,
       aiAnalysis: analysis,
     });
-    return { status: 'sales_pitch', leadId, reasons: [analysis.classification_reason] };
+    return { status: 'sales_pitch', leadId, reasons: [reason] };
   }
 
   // ── Qualified lead ───────────────────────────
   const leadId = await storeLead(lead, {
     businessId, formId, sourceUrl, ipAddress,
     status: 'qualified',
-    priority: analysis.priority || 'low',
-    leadScore: analysis.lead_score || 0,
+    priority: priority || 'low',
+    leadScore: lead_score_numeric || 20,
     aiAnalysis: analysis,
   });
 
   return {
     status: 'qualified',
     leadId,
-    score: analysis.lead_score,
-    priority: analysis.priority,
+    score: lead_score_numeric,
+    priority: priority || 'low',
     aiAnalysis: analysis,
   };
 }
@@ -138,7 +134,10 @@ async function storeLead(lead, opts) {
       priority || 'low',
       leadScore || 0,
       aiAnalysis ? JSON.stringify(aiAnalysis) : null,
-      JSON.stringify([{ layer: 1, name: 'Honeypot', result: 'PASS' }, { layer: 2, name: 'AI', result: status.toUpperCase(), classification: aiAnalysis?.classification_reason }]),
+      JSON.stringify([
+        { layer: 1, name: 'Honeypot', result: 'PASS' },
+        { layer: 2, name: 'Claude AI', result: status.toUpperCase(), reasons: aiAnalysis?.reason ? [aiAnalysis.reason] : [] },
+      ]),
       0,
     ]
   );
