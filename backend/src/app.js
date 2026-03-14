@@ -82,8 +82,31 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Auto-migrate: ensure system_settings table exists
+async function runMigrations() {
+  const { pool } = require('./config/db');
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`
+      INSERT IGNORE INTO system_settings (setting_key, setting_value)
+      VALUES ('claude_api_key', NULL)
+    `);
+    console.log('✅ Migrations applied (system_settings ready)');
+  } catch (err) {
+    console.error('⚠️  Migration warning (non-fatal):', err.message);
+  }
+}
+
 async function startServer() {
   await testConnection();
+  await runMigrations();
   app.listen(PORT, () => {
     console.log(`\n🚀 CRM API v2.0 running on http://localhost:${PORT}`);
     console.log(`   Phase 2: AI Pipeline + Spam Protection active`);

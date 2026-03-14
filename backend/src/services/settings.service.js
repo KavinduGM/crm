@@ -30,8 +30,13 @@ async function setSetting(key, value) {
 }
 
 async function getAllSettings() {
-  const [rows] = await pool.query('SELECT setting_key, setting_value, updated_at FROM system_settings');
-  return rows;
+  try {
+    const [rows] = await pool.query('SELECT setting_key, setting_value, updated_at FROM system_settings');
+    return rows;
+  } catch (err) {
+    console.error('getAllSettings DB error:', err.message);
+    return [];
+  }
 }
 
 /**

@@ -202,7 +202,7 @@ export default function LeadDetailPage() {
               <IconAI className="w-4 h-4" />
             </div>
             <h2 className="font-semibold text-slate-900">AI Analysis</h2>
-            <span className="ml-auto text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-md">Powered by GPT-4o-mini</span>
+            <span className="ml-auto text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-md">Powered by Claude AI</span>
           </div>
 
           {/* Summary */}

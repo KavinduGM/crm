@@ -47,13 +47,25 @@ Email: ${lead.email || 'Not provided'} (domain: @${emailDomain})
 Phone: ${lead.phone || 'Not provided'}
 Message: ${messageText || '(empty)'}
 
-Rules:
-- Mark is_spam: true if: marketing blast, phishing attempt, irrelevant content, spam/promo links, clearly fake submission, no genuine service request
-- Mark lead_score "high" if: large deal, urgent need, specific service request, decision-maker signals
-- Mark lead_score "medium" if: interested but vague, exploring options, early-stage inquiry
-- Mark lead_score "low" if: generic inquiry, student, low-budget signals, casual question
-- Mark lead_score "none" if: this person is pitching their OWN services to this business (cold outreach / B2B sales)
-- If is_spam is true, lead_score must be "none"
+Classification rules (apply in this exact order):
+
+1. SPAM (is_spam: true, lead_score: "none") — Use for genuine junk only:
+   • Contains URLs/links promoting other websites or products
+   • Phishing, scam, gambling, adult, crypto, lottery content
+   • Gibberish text, bot-generated, clearly fake name with numbers
+   • Mass marketing blast with no personal address
+
+2. SALES PITCH (is_spam: false, lead_score: "none") — Professional cold outreach:
+   • A real person emailing to sell THEIR OWN services/products to this business
+   • Agency/freelancer offering SEO, marketing, web design, software, etc.
+   • Phrases like "I can help your business", "our agency offers", "I came across your site"
+   • These are legitimate emails but not incoming customers — NOT spam
+
+3. QUALIFIED LEAD (is_spam: false, lead_score: high/medium/low):
+   • Genuine person wanting to USE this business's services
+   • Score HIGH: large deal, specific ask, urgency, budget mentioned, decision-maker
+   • Score MEDIUM: vague interest, early exploration, general service question
+   • Score LOW: very generic inquiry, student/academic, unclear intent
 
 Return JSON only, no other text:
 { "is_spam": true or false, "lead_score": "high" or "medium" or "low" or "none", "reason": "one sentence explanation" }`;
@@ -69,7 +81,7 @@ Return JSON only, no other text:
 
   try {
     const message = await client.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 256,
       messages: [{ role: 'user', content: prompt }],
     });

@@ -8,38 +8,35 @@ const { getSetting, setSetting, getAllSettings, getClaudeApiKey } = require('../
  * Returns all settings (API key is masked for security)
  */
 router.get('/', authMiddleware, async (req, res) => {
-  try {
-    const settings = await getAllSettings();
+  // getAllSettings() is graceful — returns [] on any DB error
+  const settings = await getAllSettings();
 
-    // Mask the API key — only show last 8 chars
-    const masked = settings.map(s => {
-      if (s.setting_key === 'claude_api_key' && s.setting_value) {
-        const val = s.setting_value;
-        return {
-          ...s,
-          setting_value: '••••••••••••••••' + val.slice(-8),
-          has_value: true,
-        };
-      }
-      return { ...s, has_value: Boolean(s.setting_value) };
-    });
+  // Mask the API key — only show last 8 chars
+  const masked = settings.map(s => {
+    if (s.setting_key === 'claude_api_key' && s.setting_value) {
+      const val = s.setting_value;
+      return {
+        ...s,
+        setting_value: '••••••••••••••••' + val.slice(-8),
+        has_value: true,
+      };
+    }
+    return { ...s, has_value: Boolean(s.setting_value) };
+  });
 
-    // Also report whether the env fallback is active
-    const dbKey = await getSetting('claude_api_key');
-    const envKey = process.env.CLAUDE_API_KEY;
+  // Report whether a key is active (DB or env fallback)
+  const dbKey = await getSetting('claude_api_key');
+  const envKey = process.env.CLAUDE_API_KEY;
 
-    res.json({
-      success: true,
-      data: masked,
-      meta: {
-        claude_key_source: dbKey ? 'database' : envKey ? 'environment' : 'none',
-        claude_key_configured: Boolean(dbKey || envKey),
-      },
-    });
-  } catch (err) {
-    console.error('GET settings error:', err);
-    res.status(500).json({ success: false, message: 'Failed to load settings' });
-  }
+  res.json({
+    success: true,
+    data: masked,
+    meta: {
+      claude_key_source: dbKey ? 'database' : envKey ? 'environment' : 'none',
+      claude_key_configured: Boolean(dbKey || envKey),
+      active_model: 'claude-haiku-4-5-20251001',
+    },
+  });
 });
 
 /**
@@ -85,7 +82,7 @@ router.post('/test-claude', authMiddleware, async (req, res) => {
     const client = new Anthropic({ apiKey });
 
     const message = await client.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 64,
       messages: [{ role: 'user', content: 'Reply with: {"status":"ok"}' }],
     });
